@@ -157,16 +157,78 @@ class AI(BaseAI):
         self.spit_pairs.add((spider.nest.id, choice.id))
         return True
     
+    def defensive_move(self, spider):
+        if spider.busy != "":
+            print("Trying to defensively move a busy spider")
+            return True
+        need_defense = []
+        for web in spider.nest.webs:
+            if web.strength < web.load:
+                continue
+            for on_web in web.spiderlings:
+                if on_web.owner != spider.owner:
+                    need_defense.append(web)
+                    break
+        if need_defense:
+            web = min(need_defense, key=lambda web: web.strength - web.load)
+            print("Incomming asshole!")
+            spider.move(web)
+            return True
+        return False
+
+    def expand_move(self, spider):
+        if len(spider.nest.spiders) == 1:
+            return False
+        if spider.busy != "":
+            print("Trying to expand move a busy spider")
+            return True
+        valid_webs = [web for web in spider.nest.webs if is_valid_web(spider, web)]
+        if not valid_webs:
+            return False
+        empty_both = [web for web in valid_webs if len(web.spiderlings) == 0 and
+                      (len(web.nest_a.spiders) == 0 or len(web.nest_b.spiders) == 0)]
+        if empty_both:
+            valid_webs = empty_both
+        choice = min(valid_webs, key=lambda web: len(web.spiderlings))
+        print("Expand the motherland")
+        spider.move(choice)
+        
+        return True
+        
+
+    def spray_spit(self, spider):
+        if spider.busy != "":
+            print("Trying to spit with a busy spider")
+            return True
+        if spider.game_object_name != "Spitter":
+            print("Trying to spit with", spider.game_object_name)
+            return False
+        valid_nests = [nest for nest in self.game.nests if is_valid_spit_connection(spider, nest)]
+        if len(valid_nests) == 0:
+            return False
+        empty_nests = [nest for nest in valid_nests if len(nest.spiders) == 0]
+        if empty_nests:
+            valid_nests = empty_nests
+        if not valid_nests:
+            print("WHAT HTE HELL!")
+            return False
+        choice = random.choice(valid_nests)
+        print("Spitting to nest", choice.id)
+        spider.spit(choice)
+        self.spit_pairs.add((spider.nest.id, choice.id))
+        return True
+    
+    
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
 
         Returns:
             bool: Represents if you want to end your turn. True means end your turn, False means to keep your turn going and re-call this function.
         """
-        print("Starting turn:", self.game.current_turn, "Time remaining:", self.player.time_remaining, "Spiders:", len(self.player.spiders))
         # TODO Consume
         # TODO Special actions
         self.setup()
+        print("Starting turn:", self.game.current_turn, "Time remaining:", self.player.time_remaining, "Score:", self.my_brood.health, self.their_brood.health)
         self.spawn()
         self.setup()
         for spider in self.need_jobs:
@@ -174,6 +236,14 @@ class AI(BaseAI):
                 # Attacks cause spiders to be busy, right?
                 assert (spider.is_dead or spider.busy != ""), "Attacked but not busy?"
                 continue
+            if self.defensive_move(spider):
+                continue
+            if self.expand_move(spider):
+                continue
+            if spider.game_object_name == "Spitter":
+                if self.spray_spit(spider):
+                    continue
+            '''
             if self.do_move(spider):
                 assert (spider.is_dead or spider.busy != ""), "Moved but not busy?"
                 continue
@@ -181,6 +251,7 @@ class AI(BaseAI):
                 if self.do_spit(spider):
                     assert spider.busy != "", "Spit but not busy?"
                     continue
+            '''
         return True
         # This is ShellAI, it is very simple, and demonstrates how to use all
         # the game objects in Spiders.
