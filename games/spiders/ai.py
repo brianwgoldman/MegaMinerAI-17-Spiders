@@ -115,6 +115,9 @@ class AI(BaseAI):
         if spider.busy != "":
             print("Trying to defensively move a busy spider")
             return True
+        if len(spider.nest.spiders) == 1:
+            # Lone spiders have to hold the nest
+            return False
         need_defense = []
         for web in spider.nest.webs:
             if web.strength < web.load:
