@@ -4,13 +4,13 @@ from joueur.base_ai import BaseAI
 
 import random
 
-rps = {"Weaver" : {"Weaver", "Cutter"},
-       "Cutter" : {"Cutter", "Spitter"},
-       "Spitter" : {"Spitter", "Weaver"}}
+rps = {"Weaver" : {"Weaver", "Spitter"},
+       "Cutter" : {"Cutter", "Weaver"},
+       "Spitter" : {"Spitter", "Cutter"}}
 
-prime_rps = {"Weaver" : "Cutter",
-             "Cutter" : "Spitter",
-             "Spitter" : "Weaver"}
+prime_rps = {"Weaver" : "Spitter",
+             "Cutter" : "Weaver",
+             "Spitter" : "Cutter"}
 
 def is_valid_web(spider, web):
     if web.strength > web.load:
@@ -22,6 +22,8 @@ def is_valid_web(spider, web):
         
 
 def is_valid_spit_connection(spider, nest):
+    if spider.nest == nest:
+        return False
     for web in spider.nest.webs:
         if web.nest_a == nest or web.nest_b == nest:
             return False
@@ -77,6 +79,9 @@ class AI(BaseAI):
         if spider.busy != "":
             print("Trying to attack with a busy spider")
             return True
+        if spider.nest == self.my_brood.nest:
+            # Never attack at your own brood nest
+            return False
         targets = [target for target in spider.nest.spiders
                    if target.owner != spider.owner and
                    not target.is_dead and 
@@ -98,12 +103,18 @@ class AI(BaseAI):
             print("Trying to move with a busy spider")
             return True
         valid_webs = [web for web in spider.nest.webs if is_valid_web(spider, web)]
+        brood_connected = [web for web in valid_webs if web == self.their_brood.nest]
+        # TODO Better move choice logic
+        if spider.nest != self.my_brood.nest or brood_connected:
+            valid_webs = brood_connected
         if len(valid_webs) == 0:
             return False
-        # TODO Better move choice logic
-        best = random.choice(spider.nest.webs)
-        print("Moving spider")
+
+        best = random.choice(valid_webs)
+        print("Moving", spider.game_object_name, best.load, best.strength)
         spider.move(best)
+        if spider.is_dead:
+            print("Died in a blaze of glory during move")
         return True
     
     def do_spit(self, spider):
@@ -113,6 +124,9 @@ class AI(BaseAI):
         if spider.game_object_name != "Spitter":
             print("Trying to spit with", spider.game_object_name)
             return False
+        if len([web for web in spider.nest.webs if is_valid_web(spider, web)]) > 0:
+            print("Available outbound webs, skip spitting")
+            return False
         valid_nests = [nest for nest in self.game.nests if is_valid_spit_connection(spider, nest)]
         if len(valid_nests) == 0:
             return False
@@ -120,6 +134,7 @@ class AI(BaseAI):
         if brood_nest:
             valid_nests = brood_nest
         choice = random.choice(valid_nests)
+        print("Spitting to nest", choice.id)
         spider.spit(choice)
         return True
     
@@ -129,12 +144,11 @@ class AI(BaseAI):
         Returns:
             bool: Represents if you want to end your turn. True means end your turn, False means to keep your turn going and re-call this function.
         """
-        print("Starting turn:", self.game.current_turn, "Time remaining:", self.player.time_remaining)
+        print("Starting turn:", self.game.current_turn, "Time remaining:", self.player.time_remaining, "Spiders:", len(self.player.spiders))
         # TODO Consume
         # TODO Special actions
         self.setup()
         self.spawn()
-        
         for spider in self.need_jobs:
             if self.do_attack(spider):
                 # Attacks cause spiders to be busy, right?
