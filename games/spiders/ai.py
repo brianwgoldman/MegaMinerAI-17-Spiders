@@ -79,7 +79,7 @@ class AI(BaseAI):
         while self.my_brood.eggs > 0:
             spider_type = random.choice(["Cutter", "Weaver", "Spitter"])
             spider_type = "Spitter"
-            print("Spawning", spider_type)
+            #print("Spawning", spider_type)
             self.my_brood.spawn(spider_type)
 
     def do_attack(self, spider):
@@ -185,12 +185,18 @@ class AI(BaseAI):
         valid_webs = [web for web in spider.nest.webs if is_valid_web(spider, web)]
         if not valid_webs:
             return False
+        # TODO Include "in flight" bad guys
         empty_both = [web for web in valid_webs if len(web.spiderlings) == 0 and
                       (len(web.nest_a.spiders) == 0 or len(web.nest_b.spiders) == 0)]
         if empty_both:
             valid_webs = empty_both
+        else:
+            brood = [web for web in valid_webs if web.nest_a == self.their_brood or web.nest_b == self.their_brood]
+            if brood:
+                print("BROOD WARS")
+                valid_webs = brood
         choice = min(valid_webs, key=lambda web: len(web.spiderlings))
-        print("Expand the motherland")
+        #print("Expand the motherland")
         spider.move(choice)
         
         return True
@@ -209,11 +215,16 @@ class AI(BaseAI):
         empty_nests = [nest for nest in valid_nests if len(nest.spiders) == 0]
         if empty_nests:
             valid_nests = empty_nests
+        else:
+            brood = [nest for nest in valid_nests if nest == self.their_brood.nest]
+            if brood and spider.nest != self.my_brood.nest:
+                print("GO AFTER THE BROOD")
+                valid_nests = brood
         if not valid_nests:
             print("WHAT HTE HELL!")
             return False
         choice = random.choice(valid_nests)
-        print("Spitting to nest", choice.id)
+        #print("Spitting to nest", choice.id)
         spider.spit(choice)
         self.spit_pairs.add((spider.nest.id, choice.id))
         return True
