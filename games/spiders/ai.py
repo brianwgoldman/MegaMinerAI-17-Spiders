@@ -5,13 +5,14 @@ from joueur.base_ai import BaseAI
 import random
 
 # Given a spider type, what can they kill
-rps = {"Weaver" : {"Weaver", "Spitter"},
-       "Cutter" : {"Cutter", "Weaver"},
-       "Spitter" : {"Spitter", "Cutter"}}
-#Given a spider type, what can they kill without dying themselves
-prime_rps = {"Weaver" : "Spitter",
-             "Cutter" : "Weaver",
-             "Spitter" : "Cutter"}
+rps = {"Weaver": {"Weaver", "Spitter"},
+       "Cutter": {"Cutter", "Weaver"},
+       "Spitter": {"Spitter", "Cutter"}}
+# Given a spider type, what can they kill without dying themselves
+prime_rps = {"Weaver": "Spitter",
+             "Cutter": "Weaver",
+             "Spitter": "Cutter"}
+
 
 def is_valid_web(spider, web):
     if web.strength > web.load:
@@ -20,7 +21,7 @@ def is_valid_web(spider, web):
     if len(mine) > (len(web.spiderlings) / 2):
         return False
     return True
-        
+
 
 def is_valid_spit_connection(spider, nest):
     if spider.nest == nest:
@@ -34,28 +35,21 @@ def is_valid_spit_connection(spider, nest):
 class AI(BaseAI):
     """ The basic AI functions that are the same between games. """
 
-
     def get_name(self):
         """ This is the name you send to the server so your AI will control the player named this string.
 
         Returns
             str: The name of your Player.
         """
-        return "the-goldman-clause" # REPLACE THIS WITH YOUR TEAM NAME
-
-
+        return "the-goldman-clause"
 
     def start(self):
         """ This is called once the game starts and your AI knows its playerID and game. You can initialize your AI here.
         """
 
-
-
     def game_updated(self):
         """ This is called every time the game's state updates, so if you are tracking anything you can update it here.
         """
-
-
 
     def end(self, won, reason):
         """ This is called when the game ends, you can clean up your data and dump files here if need be.
@@ -69,10 +63,13 @@ class AI(BaseAI):
         '''
         Create some useful collections
         '''
-        self.my_brood = [spider for spider in self.player.spiders if spider.game_object_name == "BroodMother"][0]
-        self.their_brood = [spider for spider in self.player.other_player.spiders if spider.game_object_name == "BroodMother"][0]
-        self.need_jobs = [spider for spider in self.player.spiders if spider.game_object_name != "BroodMother" and spider.busy == ""]
-    
+        self.my_brood = [spider for spider in self.player.spiders
+                         if spider.game_object_name == "BroodMother"][0]
+        self.their_brood = [spider for spider in self.player.other_player.spiders
+                            if spider.game_object_name == "BroodMother"][0]
+        self.need_jobs = [spider for spider in self.player.spiders
+                          if spider.game_object_name != "BroodMother" and spider.busy == ""]
+
     def spawn(self):
         '''
         Handes spawn logic, which is basically just "fill the world with Spitters"
@@ -89,16 +86,19 @@ class AI(BaseAI):
             print("Trying to attack with a busy spider")
             return True
         if spider.nest == self.my_brood.nest:
-            # Never attack at your own brood nest, since there can't be any enemies
+            # Never attack at your own brood nest,
+            # since there can't be any enemies
             return False
         # Find living enemies you can kill
         targets = [target for target in spider.nest.spiders
                    if target.owner != spider.owner and
-                   not target.is_dead and 
+                   not target.is_dead and
                    target.game_object_name in rps[spider.game_object_name]]
         if targets:
             # Prefer enemies that don't get you killed
-            prime_targets = [target for target in targets if prime_rps[spider.game_object_name] == target.game_object_name]
+            prime_targets = [target for target in targets if
+                             prime_rps[spider.game_object_name] ==
+                             target.game_object_name]
             if prime_targets:
                 targets = prime_targets
             target = random.choice(targets)
@@ -106,7 +106,7 @@ class AI(BaseAI):
             spider.attack(target)
             return True
         return False
-    
+
     def defensive_move(self, spider):
         '''
         Find webs connected to spider.nest that contain enemy spiders,
@@ -141,7 +141,8 @@ class AI(BaseAI):
         if spider.busy != "":
             print("Trying to expand move a busy spider")
             return True
-        valid_webs = [web for web in spider.nest.webs if is_valid_web(spider, web)]
+        valid_webs = [web for web in spider.nest.webs
+                      if is_valid_web(spider, web)]
         if not valid_webs:
             return False
         # TODO Include "in flight" spiders
@@ -151,7 +152,9 @@ class AI(BaseAI):
             valid_webs = empty_both
         else:
             # If there are no empty nests, try to attack their broodmother
-            brood = [web for web in valid_webs if web.nest_a == self.their_brood or web.nest_b == self.their_brood]
+            brood = [web for web in valid_webs
+                     if web.nest_a == self.their_brood
+                     or web.nest_b == self.their_brood]
             if brood:
                 print("BROOD WARS")
                 valid_webs = brood
@@ -159,7 +162,6 @@ class AI(BaseAI):
         choice = min(valid_webs, key=lambda web: len(web.spiderlings))
         spider.move(choice)
         return True
-        
 
     def spray_spit(self, spider):
         '''
@@ -172,7 +174,8 @@ class AI(BaseAI):
         if spider.game_object_name != "Spitter":
             print("Trying to spit with", spider.game_object_name)
             return False
-        valid_nests = [nest for nest in self.game.nests if is_valid_spit_connection(spider, nest)]
+        valid_nests = [nest for nest in self.game.nests
+                       if is_valid_spit_connection(spider, nest)]
         if len(valid_nests) == 0:
             return False
         # TODO Add "in flight" spiders
@@ -180,15 +183,15 @@ class AI(BaseAI):
         if empty_nests:
             valid_nests = empty_nests
         else:
-            brood = [nest for nest in valid_nests if nest == self.their_brood.nest]
+            brood = [nest for nest in valid_nests if nest ==
+                     self.their_brood.nest]
             if brood and spider.nest != self.my_brood.nest:
                 print("GO AFTER THE BROOD")
                 valid_nests = brood
         choice = random.choice(valid_nests)
         spider.spit(choice)
         return True
-    
-    
+
     def run_turn(self):
         '''
         Each non busy spider tries to
@@ -198,7 +201,8 @@ class AI(BaseAI):
         4. If they are a Spitter, try to connect to nests with no spiders 
         '''
         self.setup()
-        print("Starting turn:", self.game.current_turn, "Time remaining:", self.player.time_remaining, "Score:", self.my_brood.health, self.their_brood.health)
+        print("Starting turn:", self.game.current_turn, "Time remaining:",
+              self.player.time_remaining, "Score:", self.my_brood.health, self.their_brood.health)
         self.spawn()
         # Rerun setup to find spawned things
         self.setup()
