@@ -3,6 +3,7 @@
 from joueur.base_ai import BaseAI
 
 import random
+import math
 
 rps = {"Weaver" : {"Weaver", "Spitter"},
        "Cutter" : {"Cutter", "Weaver"},
@@ -11,6 +12,9 @@ rps = {"Weaver" : {"Weaver", "Spitter"},
 prime_rps = {"Weaver" : "Spitter",
              "Cutter" : "Weaver",
              "Spitter" : "Cutter"}
+
+def distance(a, b):
+    return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
 def is_valid_web(spider, web):
     if web.strength > web.load:
@@ -68,10 +72,13 @@ class AI(BaseAI):
         self.my_brood = [spider for spider in self.player.spiders if spider.game_object_name == "BroodMother"][0]
         self.their_brood = [spider for spider in self.player.other_player.spiders if spider.game_object_name == "BroodMother"][0]
         self.need_jobs = [spider for spider in self.player.spiders if spider.game_object_name != "BroodMother" and spider.busy == ""]
+        self.spit_pairs = {(spider.nest.id, spider.spitting_web_to_nest) for spider in self.player.spiders
+                           if spider.game_object_name == "Spitter" and spider.busy == "Spitting"}
     
     def spawn(self):
         while self.my_brood.eggs > 0:
             spider_type = random.choice(["Cutter", "Weaver", "Spitter"])
+            spider_type = "Spitter"
             print("Spawning", spider_type)
             self.my_brood.spawn(spider_type)
 
@@ -124,18 +131,30 @@ class AI(BaseAI):
         if spider.game_object_name != "Spitter":
             print("Trying to spit with", spider.game_object_name)
             return False
+        '''
         if len([web for web in spider.nest.webs if is_valid_web(spider, web)]) > 0:
             print("Available outbound webs, skip spitting")
             return False
+        '''
         valid_nests = [nest for nest in self.game.nests if is_valid_spit_connection(spider, nest)]
         if len(valid_nests) == 0:
             return False
         brood_nest = [nest for nest in valid_nests if nest == self.their_brood.nest]
         if brood_nest:
             valid_nests = brood_nest
-        choice = random.choice(valid_nests)
+        join_nests = [nest for nest in valid_nests
+                      if (nest.id, spider.nest.id) in self.spit_pairs
+                      or (spider.nest.id, nest.id) in self.spit_pairs]
+        if join_nests:
+            print("Joining spit")
+            valid_nests = join_nests
+        if not valid_nests:
+            print("WHAT HTE HELL!")
+            return False
+        choice = min(valid_nests, key=lambda nest : distance(spider.nest, nest) + distance(nest, self.their_brood.nest))
         print("Spitting to nest", choice.id)
         spider.spit(choice)
+        self.spit_pairs.add((spider.nest.id, choice.id))
         return True
     
     def run_turn(self):
@@ -149,18 +168,19 @@ class AI(BaseAI):
         # TODO Special actions
         self.setup()
         self.spawn()
+        self.setup()
         for spider in self.need_jobs:
             if self.do_attack(spider):
                 # Attacks cause spiders to be busy, right?
                 assert (spider.is_dead or spider.busy != ""), "Attacked but not busy?"
                 continue
+            if self.do_move(spider):
+                assert (spider.is_dead or spider.busy != ""), "Moved but not busy?"
+                continue
             if spider.game_object_name == "Spitter":
                 if self.do_spit(spider):
                     assert spider.busy != "", "Spit but not busy?"
                     continue
-            if self.do_move(spider):
-                assert (spider.is_dead or spider.busy != ""), "Moved but not busy?"
-                continue
         return True
         # This is ShellAI, it is very simple, and demonstrates how to use all
         # the game objects in Spiders.
