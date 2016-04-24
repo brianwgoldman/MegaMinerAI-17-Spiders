@@ -78,7 +78,9 @@ class AI(BaseAI):
             print("Trying to attack with a busy spider")
             return True
         targets = [target for target in spider.nest.spiders
-                   if target.owner != spider.owner and target.game_object_name in rps[spider.game_object_name]]
+                   if target.owner != spider.owner and
+                   not target.is_dead and 
+                   target.game_object_name in rps[spider.game_object_name]]
         if targets:
             prime_targets = [target for target in targets if prime_rps[spider.game_object_name] == target.game_object_name]
             if prime_targets:
@@ -87,6 +89,7 @@ class AI(BaseAI):
             target = random.choice(targets)
             print(spider.game_object_name, "attacking", target.game_object_name)
             spider.attack(target)
+            assert not spider.is_dead or target.is_dead, "Suicide without gain!"
             return True
         return False
     
@@ -126,6 +129,7 @@ class AI(BaseAI):
         Returns:
             bool: Represents if you want to end your turn. True means end your turn, False means to keep your turn going and re-call this function.
         """
+        print("Starting turn:", self.game.current_turn, "Time remaining:", self.player.time_remaining)
         # TODO Consume
         # TODO Special actions
         self.setup()
@@ -134,14 +138,14 @@ class AI(BaseAI):
         for spider in self.need_jobs:
             if self.do_attack(spider):
                 # Attacks cause spiders to be busy, right?
-                assert(spider.busy != "")
+                assert (spider.is_dead or spider.busy != ""), "Attacked but not busy?"
                 continue
             if spider.game_object_name == "Spitter":
                 if self.do_spit(spider):
-                    assert(spider.busy != "")
+                    assert spider.busy != "", "Spit but not busy?"
                     continue
             if self.do_move(spider):
-                assert(spider.is_dead or spider.busy != "")
+                assert (spider.is_dead or spider.busy != ""), "Moved but not busy?"
                 continue
         return True
         # This is ShellAI, it is very simple, and demonstrates how to use all
