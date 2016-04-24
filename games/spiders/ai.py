@@ -40,7 +40,7 @@ class AI(BaseAI):
         Returns
             str: The name of your Player.
         """
-        return "Spiders Python Player" # REPLACE THIS WITH YOUR TEAM NAME
+        return "the-goldman-clause" # REPLACE THIS WITH YOUR TEAM NAME
 
 
 
